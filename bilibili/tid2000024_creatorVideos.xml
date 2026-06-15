@@ -1,0 +1,78 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000024" version="0.0.6" commited="true">
+  <attrs>
+    <attr name="name" value="bilibili - 获取博主发布的视频" />
+    <attr name="desc" value="bilibili - 获取博主发布的视频，可指定期望的视频数" />
+    <attr name="domainId" value="10004" />
+    <attr name="domainNum" value="-1" />
+    <attr name="capName" value="bilibili" />
+    <attr name="capNum" value="-1" />
+  </attrs>
+  <paras>
+    <para paraname="para1" name="博主ID" desc="博主ID，如'https://space.bilibili.com/123456789'中的123456789" />
+    <para paraname="para2" name="视频数" desc="期望的视频数，缺省为25*2=50" defval="50" />
+    <para paraname="para3" name="排序" desc="搜索结果排序，缺省为综合排序，其它有效排序包括click最多播放/pubdate最新发布/dm最多弹幕/stow最多收藏" defval="" />
+  </paras>
+  <actions>
+    <action_setvar_templstr varname="pageSize" templ="25" />
+    <action_setvar_templstr varname="pageCnt" templ="${inParas.para2} / ${pageSize}">
+      <transform>
+        <fun_tonum />
+        <fun_n_ceil />
+      </transform>
+    </action_setvar_templstr>
+    <action_setvar_templstr varname="orderBy" templ="${inParas.para3}" />
+    <action_setvar_templstr varname="url" templ="https://api.bilibili.com/x/space/wbi/arc/search" />
+    <action_loopfor from="1" to="${pageCnt}" maxloops="${pageCnt}" varname="pageNo">
+      <action_api url="${url}" method="GET" data="{}" varname="response" headerssource="origStateHeaders" format="params" tabname="dat_0000000000006001">
+        <object_key key="mid" value="${inParas.para1}" />
+        <object_key key="pn" value="${pageNo}" datatype="number" />
+        <object_key key="ps" value="${pageSize}" datatype="number" />
+        <object_key key="order" value="${orderBy}" />
+        <object_key key="wts" value="${sysParas.currentUnixTs}" />
+        <object_key key="w_rid" value="__this__">
+          <transform usevar="true">
+            <fun_o_replace substr="[!'()*]" flags="g" newstr="" />
+            <fun_o_sort valtype="string" sorttype="asc" />
+            <fun_o_entries />
+            <fun_a_join join="&amp;" />
+            <fun_concat str1="${userData.salt}" />
+            <fun_hashcode hashmethod="MD5" />
+          </transform>
+        </object_key>
+      </action_api>
+      <action_ifelse>
+        <condition_templstr templ="${pageNo}">
+          <transform>
+            <fun_n_eq number2="1" />
+          </transform>
+          <action_setvar_templstr varname="pageCnt" templ="${response}">
+            <transform usevar="true">
+              <fun_o_attr subkeys="data.page.count" />
+              <fun_concat str1=" / ${pageSize}" />
+              <fun_tonum />
+              <fun_n_ceil />
+              <fun_n_min number2="${pageCnt}" />
+            </transform>
+          </action_setvar_templstr>
+        </condition_templstr>
+      </action_ifelse>
+      <action_wait_sleep minms="500" maxms="2000" />
+    </action_loopfor>
+    <action_extract_array list="dat_0000000000006001" subkeys="responseData.data.list.vlist" idxname="idx">
+      <column_property subkeys="aid" colname="avId" />
+      <column_property subkeys="bvid" colname="bvId" />
+      <column_property subkeys="title" colname="title" />
+      <column_property subkeys="mid" colname="creatorId" />
+      <column_property subkeys="author" colname="nickname" />
+      <column_property subkeys="comment" colname="commentCount" />
+      <column_property subkeys="description" colname="description" />
+      <column_property subkeys="length" colname="duration" />
+      <column_property subkeys="play" colname="playCount" />
+      <column_property subkeys="video_review" colname="danmuka" />
+      <column_property subkeys="created" colname="pubDate" />
+      <column_property subkeys="pic" colname="picture" />
+      <column_templstr colname="idx" templ="${idx}" />
+    </action_extract_array>
+  </actions>
+</template>

@@ -1,0 +1,73 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000027" version="0.0.6" commited="true">
+  <attrs>
+    <attr name="name" value="bilibili - 获取博主的关注者" />
+    <attr name="desc" value="bilibili - 获取博主的关注者，可指定期望的关注者数" />
+    <attr name="domainId" value="10004" />
+    <attr name="domainNum" value="-1" />
+    <attr name="capName" value="bilibili" />
+    <attr name="capNum" value="-1" />
+  </attrs>
+  <paras>
+    <para paraname="para1" name="博主ID" desc="博主ID，如'https://space.bilibili.com/123456789'中的123456789" />
+    <para paraname="para2" name="关注者数" desc="期望获取的关注者数，缺省为24*2=48" defval="48" />
+  </paras>
+  <actions>
+    <action_setvar_templstr varname="pageSize" templ="24" />
+    <action_setvar_templstr varname="pageCnt" templ="${inParas.para2} / ${pageSize}">
+      <transform>
+        <fun_tonum />
+        <fun_n_ceil />
+      </transform>
+    </action_setvar_templstr>
+    <action_setvar_templstr varname="url" templ="https://api.bilibili.com/x/relation/followings" />
+    <action_loopfor from="1" to="${pageCnt}" maxloops="${pageCnt}" varname="pageNo">
+      <action_api url="${url}" method="GET" data="{}" varname="response" headerssource="origStateHeaders" format="params" tabname="dat_0000000000006001">
+        <object_key key="vmid" value="${inParas.para1}" />
+        <object_key key="pn" value="${pageNo}" datatype="number" />
+        <object_key key="ps" value="${pageSize}" datatype="number" />
+        <object_key key="gaia_source" value="main_web" />
+      </action_api>
+      <action_ifelse>
+        <condition_templstr templ="${pageNo}">
+          <transform>
+            <fun_n_eq number2="1" />
+          </transform>
+          <action_ifelse>
+            <condition_templstr templ="${response}">
+              <transform>
+                <fun_o_attr subkeys="code" />
+                <fun_n_eq number2="0" />
+                <fun_not />
+              </transform>
+              <action_exit errname="normal" />
+            </condition_templstr>
+          </action_ifelse>
+          <action_setvar_templstr varname="pageCnt" templ="${response}">
+            <transform usevar="true">
+              <fun_o_attr subkeys="data.total" />
+              <fun_concat str1=" / ${pageSize}" />
+              <fun_tonum />
+              <fun_n_ceil />
+              <fun_n_min number2="${pageCnt}" />
+            </transform>
+          </action_setvar_templstr>
+        </condition_templstr>
+      </action_ifelse>
+      <action_wait_sleep minms="500" maxms="2000" />
+    </action_loopfor>
+    <action_extract_array list="dat_0000000000006001" subkeys="responseData.data.list" idxname="idx" errname="ignore">
+      <column_templstr colname="creatorId" templ="${inParas.para1}" />
+      <column_property subkeys="mid" colname="followingId" />
+      <column_property subkeys="uname" colname="nickname" />
+      <column_property subkeys="sign" colname="sign" />
+      <column_property subkeys="face" colname="avatar" />
+      <column_property subkeys="mtime" colname="mtime" />
+      <column_templstr colname="idx" templ="${idx}" />
+    </action_extract_array>
+    <action_exit errname="normal" />
+    <action_extract tabname="dat_0000000000009911">
+      <column_templstr colname="response" templ="${response}" />
+    </action_extract>
+  </actions>
+</template>

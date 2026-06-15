@@ -1,0 +1,60 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000022" version="0.0.12" commited="true">
+  <attrs>
+    <attr name="name" value="bilibili - 获取一个视频的详情" />
+    <attr name="desc" value="bilibili - 获取一个视频的详情，视频标识为aid或bvid" />
+    <attr name="domainId" value="10004" />
+    <attr name="domainNum" value="-1" />
+    <attr name="capName" value="bilibili" />
+    <attr name="capNum" value="-1" />
+  </attrs>
+  <paras>
+    <para paraname="para1" name="视频标识" desc="aid或bvid，bvid以'BV'开始" />
+  </paras>
+  <actions>
+    <action_setvar_templstr varname="url" templ="https://api.bilibili.com/x/web-interface/view/detail" />
+    <action_setvar_templstr varname="idName" templ="${inParas.para1}">
+      <transform>
+        <fun_startswith str="BV" />
+        <fun_decode str1="1" val1="bvid" defaultval="aid" />
+      </transform>
+    </action_setvar_templstr>
+    <action_api url="${url}" method="GET" data="{}" headerssource="origStateHeaders" format="params" tabname="dat_0000000000007001" varname="dbgdbgVideoDetailJson">
+      <object_key key="${idName}" value="${inParas.para1}" />
+    </action_api>
+    <action_extract_array list="dat_0000000000007001" subkeys="responseData.data.View">
+      <column_property subkeys="aid" colname="avId" />
+      <column_property subkeys="bvid" colname="bvId" />
+      <column_property subkeys="title" colname="title" />
+      <column_property subkeys="desc" colname="desc" />
+      <column_property subkeys="pubdate" colname="createTime" />
+      <column_property subkeys="owner.mid" colname="creatorId" />
+      <column_property subkeys="owner.name" colname="nickname" />
+      <column_property subkeys="owner.face" colname="avatar" />
+      <column_property subkeys="stat.like" colname="likedCount" />
+      <column_property subkeys="stat.dislike" colname="dislikedCount" />
+      <column_property subkeys="stat.view" colname="videoPlayCount" />
+      <column_property subkeys="stat.favorite" colname="videoFavoriteCount" />
+      <column_property subkeys="stat.share" colname="videoShareCount" />
+      <column_property subkeys="stat.coin" colname="videoCoinCount" />
+      <column_property subkeys="stat.danmaku" colname="videoDanmaku" />
+      <column_property subkeys="stat.reply" colname="videoComment" />
+      <column_templstr colname="lastModifyTs" templ="${sysParas.currentUnixTs}" />
+      <column_property subkeys="pic" colname="videoCoverUrl" />
+      <column_templstr colname="tags" templ="${response}">
+        <transform>
+          <fun_o_attr subkeys="data.Tags" />
+          <fun_a_mapattr subkeys="tag_name" />
+          <fun_a_join join="," />
+        </transform>
+      </column_templstr>
+      <column_templstr colname="relatedAvIds" templ="${response}">
+        <transform>
+          <fun_o_attr subkeys="data.Related" />
+          <fun_a_mapattr subkeys="aid" />
+          <fun_a_join join="," />
+        </transform>
+      </column_templstr>
+    </action_extract_array>
+  </actions>
+</template>

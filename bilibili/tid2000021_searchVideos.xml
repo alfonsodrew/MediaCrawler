@@ -1,0 +1,94 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000021" version="0.0.10" commited="true">
+  <attrs>
+    <attr name="name" value="bilibili - 搜索前几页的视频" />
+    <attr name="desc" value="bilibili - 通过关键字搜索前几页的视频" />
+    <attr name="domainId" value="10004" />
+    <attr name="domainNum" value="-1" />
+    <attr name="capName" value="bilibili" />
+    <attr name="capNum" value="-1" />
+  </attrs>
+  <paras>
+    <para paraname="para1" name="关键词" desc="搜索关键词" />
+    <para paraname="para2" name="分页数" desc="分页数" uitype="number" min="1" max="20" defval="1" />
+    <para paraname="para3" name="一页视频数" desc="一页显示的视频数" uitype="number" min="10" max="50" defval="20" />
+    <para paraname="para4" name="排序" desc="搜索结果排序，缺省为综合排序，其它有效排序包括click最多播放/pubdate最新发布/dm最多弹幕/stow最多收藏" defval="" />
+    <para paraname="para5" name="开始日期" desc="开始日期，缺省为0，表示没有限制" defval="0" />
+    <para paraname="para6" name="结束日期" desc="结束日期，缺省为0，表示没有限制" defval="0" />
+  </paras>
+  <actions>
+    <action_setvar_templstr varname="url" templ="https://api.bilibili.com/x/web-interface/wbi/search/type" />
+    <action_setvar_templstr varname="maxLoops" templ="${inParas.para2}}" />
+    <action_loopfor from="1" to="${inParas.para2}" maxloops="${maxLoops}" varname="pageIdx">
+      <action_api url="${url}" method="GET" data="{}" tabname="dat_0000000000007001" varname="dbgdbgBilibiliSearchJson" headerssource="origStateHeaders" format="params">
+        <object_key key="search_type" value="video" />
+        <object_key key="keyword" value="${inParas.para1}">
+          <transform>
+            <fun_urlencode method="URIComponent" />
+          </transform>
+        </object_key>
+        <object_key key="page" value="${pageIdx}" datatype="number" />
+        <object_key key="page_size" value="${inParas.para3}" datatype="number" />
+        <object_key key="order" value="${inParas.para4}" />
+        <object_key key="pubtime_begin_s" value="${inParas.para5}" datatype="number" />
+        <object_key key="pubtime_end_s" value="${inParas.para6}" datatype="number" />
+        <object_key key="wts" value="${sysParas.currentUnixTs}" />
+        <object_key key="w_rid" value="__this__">
+          <transform usevar="true">
+            <fun_o_replace substr="[!'()*]" flags="g" newstr="" />
+            <fun_o_sort valtype="string" sorttype="asc" />
+            <fun_o_entries />
+            <fun_a_join join="&amp;" />
+            <fun_concat str1="${userData.salt}" />
+            <fun_hashcode hashmethod="MD5" />
+          </transform>
+        </object_key>
+        <object_key key="keyword" value="${inParas.para1}" />
+      </action_api>
+      <action_ifelse>
+        <condition_templstr templ="${pageIdx}">
+          <transform>
+            <fun_n_eq number2="1" />
+          </transform>
+          <action_setvar_templstr varname="maxLoops" templ="${dbgdbgBilibiliSearchJson}">
+            <transform>
+              <fun_o_attr subkeys="data.numPages" />
+            </transform>
+          </action_setvar_templstr>
+        </condition_templstr>
+        <condition_else>
+          <action_wait_sleep minms="500" maxms="1000" />
+        </condition_else>
+      </action_ifelse>
+    </action_loopfor>
+    <action_extract_array list="dat_0000000000007001" subkeys="responseData.data.result" idxname="idx">
+      <column_property subkeys="id" colname="id" />
+      <column_property subkeys="aid" colname="avId" />
+      <column_property subkeys="bvid" colname="bvId" />
+      <column_property subkeys="mid" colname="creatorId" />
+      <column_property subkeys="author" colname="author" />
+      <column_property subkeys="title" colname="title">
+        <transform>
+          <fun_x_text loc="" xml="false" />
+        </transform>
+      </column_property>
+      <column_property subkeys="play" colname="playCount" />
+      <column_property subkeys="danmaku" colname="dmCount" />
+      <column_property subkeys="like" colname="likeCount" />
+      <column_property subkeys="favorites" colname="favoritesCount" />
+      <column_property subkeys="review" colname="reviewCount" />
+      <column_property subkeys="description" colname="description" />
+      <column_property subkeys="tag" colname="tag" />
+      <column_property subkeys="duration" colname="duration" />
+      <column_property subkeys="typeid" colname="typeId" />
+      <column_property subkeys="typename" colname="typeName" />
+      <column_property subkeys="pubdate" colname="pubDate" />
+      <column_property subkeys="pic" colname="picture">
+        <transform>
+          <fun_insert str="https:" />
+        </transform>
+      </column_property>
+      <column_templstr colname="idx" templ="${idx}" />
+    </action_extract_array>
+  </actions>
+</template>

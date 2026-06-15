@@ -1,0 +1,148 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000023" version="0.0.8" commited="true">
+  <attrs>
+    <attr name="name" value="bilibili - 获取一个视频的评论" />
+    <attr name="desc" value="bilibili - 获取一个视频的评论，可指定期望的一级评论数和每个一级评论的二级评论数" />
+    <attr name="domainId" value="10004" />
+    <attr name="domainNum" value="-1" />
+    <attr name="capName" value="bilibili" />
+    <attr name="capNum" value="-1" />
+  </attrs>
+  <paras>
+    <para paraname="para1" name="视频标识" desc="avid" />
+    <para paraname="para2" name="一级评论数" desc="一级评论数(comment)，缺省为10*2=20" defval="20" />
+    <para paraname="para3" name="二级评论数" desc="每个一级评论的二级评论数(reply)，-1表示不保存二级评论，0表示不单独获取二级评论" defval="0" />
+    <para paraname="para4" name="排序" desc="评论排序，3 - 最熱，2 - 最新" defval="3" />
+  </paras>
+  <actions>
+    <action_setvar_templstr varname="maxCommentCnt" templ="${inParas.para2}" />
+    <action_setvar_templstr varname="maxReplyCnt" templ="${inParas.para3}" />
+    <action_setvar_templstr varname="orderBy" templ="${inParas.para4}" />
+    <action_setvar_templstr varname="commentUrl" templ="https://api.bilibili.com/x/v2/reply/wbi/main" />
+    <action_setvar_templstr varname="replyUrl" templ="https://api.bilibili.com/x/v2/reply/reply" />
+    <action_setvar_templstr varname="commentIdx" templ="1" />
+    <action_setvar_templstr varname="next" templ="0" />
+    <action_loopfor from="1" to="3" varname="loopIdx">
+      <!-- Step 1. 获取一级评论(comment) -->
+      <action_api url="${commentUrl}" method="GET" data="{}" headerssource="origStateHeaders" format="params" tabname="dat_0000000000006001" subkeys="data" setkeys="cursor,replies">
+        <object_key key="oid" value="${inParas.para1}" />
+        <object_key key="mode" value="${orderBy}" />
+        <object_key key="type" value="1" datatype="number" />
+        <object_key key="ps" value="20" datatype="number" />
+        <object_key key="next" value="${next}" datatype="number" />
+        <object_key key="wts" value="${sysParas.currentUnixTs}" />
+        <object_key key="w_rid" value="__this__">
+          <transform usevar="true">
+            <fun_o_replace substr="[!'()*]" flags="g" newstr="" />
+            <fun_o_sort valtype="string" sorttype="asc" />
+            <fun_o_entries />
+            <fun_a_join join="&amp;" />
+            <fun_concat str1="${userData.salt}" />
+            <fun_hashcode hashmethod="MD5" />
+          </transform>
+        </object_key>
+      </action_api>
+      <action_setvar_templstr varname="next" templ="${cursor}">
+        <transform>
+          <fun_o_attr subkeys="next" />
+        </transform>
+      </action_setvar_templstr>
+      <action_loopinstr list="${replies}" varname="reply" split="array" plusvarname="commentIdx">
+        <action_extract_array list="${reply}" tabname="dat_0000000000009921">
+          <column_property subkeys="rpid" colname="commentId" setvar="true" />
+          <column_property subkeys="root" colname="rootId" />
+          <column_property subkeys="parent" colname="parentId" />
+          <column_property subkeys="ctime" colname="createTime" />
+          <column_property subkeys="oid" colname="videoId" />
+          <column_property subkeys="content.message" colname="content" />
+          <column_property subkeys="member.mid" colname="commenterId" />
+          <column_property subkeys="member.uname" colname="nickname" />
+          <column_property subkeys="rcount" colname="replyCount" setvar="true" />
+          <column_property subkeys="like" colname="likes" />
+          <column_templstr colname="idx" templ="${commentIdx}" />
+        </action_extract_array>
+        <action_setvar_templstr varname="repliesInComment" templ="${reply}">
+          <transform>
+            <fun_o_attr subkeys="replies" />
+            <fun_decode str1="" val1="[]" defaultval="__orig__" />
+          </transform>
+        </action_setvar_templstr>
+        <action_setvar_templstr varname="replyNumInComment" templ="${repliesInComment}">
+          <transform>
+            <fun_a_length />
+          </transform>
+        </action_setvar_templstr>
+        <!-- Step 2. 获取二级评论(reply, ID统一使用commentId) -->
+        <action_ifelse>
+          <!-- Step 2.1. 从一级评论附带内容中提取二级评论 -->
+          <condition_templstr
+            templ="${maxReplyCnt} &gt;= 0 &amp;&amp; ${replyNumInComment} &gt; 0 &amp;&amp; ( ${replyNumInComment} &gt;= ${maxReplyCnt} || ${replyNumInComment} &gt;= ${replyCount} ) ">
+            <action_extract_array tabname="dat_0000000000009921" list="${repliesInComment}" idxname="replyIdx">
+              <column_property subkeys="rpid" colname="commentId" />
+              <column_property subkeys="root" colname="rootId" />
+              <column_property subkeys="parent" colname="parentId" />
+              <column_property subkeys="ctime" colname="createTime" />
+              <column_property subkeys="oid" colname="videoId" />
+              <column_property subkeys="content.message" colname="content" />
+              <column_property subkeys="member.mid" colname="commenterId" />
+              <column_property subkeys="member.uname" colname="nickname" />
+              <column_property subkeys="rcount" colname="replyCount" />
+              <column_property subkeys="like" colname="likes" />
+              <column_templstr colname="idx" templ="${replyIdx}" />
+            </action_extract_array>
+          </condition_templstr>
+          <!-- Step 2.2. 发送新API请求获取二级评论 -->
+          <condition_templstr templ="${maxReplyCnt} &gt; 0 &amp;&amp; ${replyCount} &gt; 0">
+            <action_setvar_templstr varname="replyPages" templ="${replyCount}">
+              <transform usevar="true">
+                <fun_n_min number2="${maxReplyCnt}" />
+                <fun_concat str1="/10" />
+                <fun_tonum />
+                <fun_n_ceil />
+              </transform>
+            </action_setvar_templstr>
+            <action_loopfor from="1" to="${replyPages}" varname="subloopIdx">
+              <action_api url="${replyUrl}" method="GET" data="{}" headerssource="origStateHeaders" format="params" tabname="dat_0000000000006002">
+                <object_key key="oid" value="${inParas.para1}" />
+                <object_key key="type" value="1" datatype="number" />
+                <object_key key="root" value="${commentId}" datatype="number" />
+                <object_key key="ps" value="10" datatype="number" />
+                <object_key key="pn" value="${subloopIdx}" datatype="number" />
+              </action_api>
+              <action_wait_sleep minms="500" maxms="2000" />
+            </action_loopfor>
+            <action_extract_array tabname="dat_0000000000009921" list="dat_0000000000006002" setprocessed="true" skipprocessed="true" subkeys="responseData.data.replies"
+              idxname="replyIdx">
+              <column_property subkeys="rpid" colname="commentId" />
+              <column_property subkeys="root" colname="rootId" />
+              <column_property subkeys="parent" colname="parentId" />
+              <column_property subkeys="ctime" colname="createTime" />
+              <column_property subkeys="oid" colname="videoId" />
+              <column_property subkeys="content.message" colname="content" />
+              <column_property subkeys="member.mid" colname="commenterId" />
+              <column_property subkeys="member.uname" colname="nickname" />
+              <column_property subkeys="rcount" colname="replyCount" />
+              <column_property subkeys="like" colname="likes" />
+              <column_templstr colname="idx" templ="${replyIdx}" />
+            </action_extract_array>
+          </condition_templstr>
+        </action_ifelse>
+      </action_loopinstr>
+      <action_ifelse>
+        <condition_templstr templ="${cursor}">
+          <transform>
+            <fun_o_attr subkeys="is_end" />
+          </transform>
+          <action_break />
+        </condition_templstr>
+        <condition_templstr templ="${commentIdx}">
+          <transform usevar="true">
+            <fun_n_gt number2="${maxCommentCnt}" />
+          </transform>
+          <action_break />
+        </condition_templstr>
+      </action_ifelse>
+      <action_wait_sleep minms="500" maxms="2000" />
+    </action_loopfor>
+  </actions>
+</template>

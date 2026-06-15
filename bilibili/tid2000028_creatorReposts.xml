@@ -1,0 +1,66 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000028" version="0.0.6" commited="true">
+  <attrs>
+    <attr name="name" value="bilibili - 获取博主的动态" />
+    <attr name="desc" value="bilibili - 获取博主的动态，可指定期望的动态数" />
+    <attr name="domainId" value="10004" />
+    <attr name="domainNum" value="-1" />
+    <attr name="capName" value="bilibili" />
+    <attr name="capNum" value="-1" />
+  </attrs>
+  <paras>
+    <para paraname="para1" name="博主ID" desc="博主ID，如'https://space.bilibili.com/123456789'中的123456789" />
+    <para paraname="para2" name="动态数" desc="动态数, 缺省为12*2=24" defval="24" />
+  </paras>
+  <actions>
+    <action_setvar_templstr varname="maxDynamicCnt" templ="${inParas.para2}" />
+    <action_setvar_templstr varname="url" templ="https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space" />
+    <action_setvar_templstr varname="dynamicIdx" templ="1" />
+    <action_setvar_templstr varname="offset" templ="" />
+    <action_loopfor from="1" to="50" varname="varname">
+      <action_api url="${url}" method="GET" data="{}" varname="response" headerssource="origStateHeaders" format="params">
+        <object_key key="host_mid" value="${inParas.para1}" />
+        <object_key key="offset" value="${offset}" />
+      </action_api>
+      <action_extract_array list="${response}" subkeys="data.items" plusvarname="dynamicIdx">
+        <column_templstr colname="creatorId" templ="${inParas.para1}" />
+        <column_property subkeys="id_str" colname="dynamicId" />
+        <column_property subkeys="basic.comment_id_str" colname="commentIdStr" />
+        <column_property subkeys="type" colname="type">
+          <transform>
+            <fun_split split="_" />
+            <fun_a_at idx="-1" />
+          </transform>
+        </column_property>
+        <column_property subkeys="modules.module_author.pub_ts" colname="pubTs" />
+        <column_property subkeys="modules.module_stat.comment.count" colname="totalComments" />
+        <column_property subkeys="modules.module_stat.forward.count" colname="totalForwards" />
+        <column_property subkeys="modules.module_stat.like.count" colname="totalLiked" />
+        <column_property subkeys="modules.module_dynamic.major.archive.desc" colname="text" />
+      </action_extract_array>
+      <action_ifelse>
+        <condition_templstr templ="${response}">
+          <transform>
+            <fun_o_attr subkeys="data.has_more" />
+            <fun_not />
+          </transform>
+          <action_break />
+        </condition_templstr>
+        <condition_templstr templ="${dynamicIdx}">
+          <transform usevar="true">
+            <fun_n_gt number2="${maxDynamicCnt}" />
+          </transform>
+          <action_break />
+        </condition_templstr>
+        <condition_else>
+          <action_setvar_templstr varname="offset" templ="${response}">
+            <transform>
+              <fun_o_attr subkeys="data.offset" />
+            </transform>
+          </action_setvar_templstr>
+        </condition_else>
+      </action_ifelse>
+      <action_wait_sleep minms="500" maxms="1500" />
+    </action_loopfor>
+  </actions>
+</template>

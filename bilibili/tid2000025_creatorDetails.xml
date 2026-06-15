@@ -1,0 +1,52 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000025" version="0.0.6" commited="true">
+  <attrs>
+    <attr name="name" value="bilibili - 获取博主的详情" />
+    <attr name="desc" value="bilibili - 获取博主的详情" />
+    <attr name="domainId" value="10004" />
+    <attr name="domainNum" value="-1" />
+    <attr name="capName" value="bilibili" />
+    <attr name="capNum" value="-1" />
+  </attrs>
+  <paras>
+    <para paraname="para1" name="博主ID" desc="博主ID，如'https://space.bilibili.com/123456789'中的123456789" />
+  </paras>
+  <actions>
+    <action_setvar_templstr varname="creatorId" templ="${inParas.para1}" />
+    <action_setvar_templstr varname="statUrl" templ="https://api.bilibili.com/x/relation/stat?vmid=${creatorId}" />
+    <action_setvar_templstr varname="upstatUrl" templ="https://api.bilibili.com/x/space/upstat?mid=${creatorId}" />
+    <action_setvar_templstr varname="infoUrl" templ="https://api.bilibili.com/x/space/wbi/acc/info" />
+    <action_api url="${statUrl}" headerssource="origStateHeaders" subkeys="data" setkeys="follower,following,black,whisper" />
+    <action_api url="${upstatUrl}" headerssource="origStateHeaders" varname="upstatData" subkeys="data" setkeys="likes" />
+    <action_setvar_templstr varname="views" templ="${upstatData}">
+      <transform>
+        <fun_o_attr subkeys="archive.view" />
+      </transform>
+    </action_setvar_templstr>
+    <action_api url="${infoUrl}" method="GET" data="{}" headerssource="origStateHeaders" format="params" varname="infoResponse">
+      <object_key key="mid" value="${inParas.para1}" />
+      <object_key key="wts" value="${sysParas.currentUnixTs}" />
+      <object_key key="w_rid" value="__this__">
+        <transform usevar="true">
+          <fun_o_replace substr="[!'()*]" flags="g" newstr="" />
+          <fun_o_sort valtype="string" sorttype="asc" />
+          <fun_o_entries />
+          <fun_a_join join="&amp;" />
+          <fun_concat str1="${userData.salt}" />
+          <fun_hashcode hashmethod="MD5" />
+        </transform>
+      </object_key>
+    </action_api>
+    <action_extract_array list="${infoResponse}" subkeys="data" keys="">
+      <column_property subkeys="mid" colname="creatorId" />
+      <column_property subkeys="name" colname="nickname" />
+      <column_property subkeys="sign" colname="sign" />
+      <column_property subkeys="face" colname="avatar" />
+      <column_property subkeys="level" colname="level" />
+      <column_templstr colname="following" templ="${following}" />
+      <column_templstr colname="fans" templ="${follower}" />
+      <column_templstr colname="likes" templ="${likes}" />
+      <column_templstr colname="views" templ="${views}" />
+    </action_extract_array>
+  </actions>
+</template>

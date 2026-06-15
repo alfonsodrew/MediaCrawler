@@ -1,0 +1,71 @@
+<?xml-model href="https://www.LetsScrapeData.com/xsd/lsd_en.xsd" type="application/xml" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<template tid="2000019" version="0.0.4" commited="true">
+  <attrs>
+    <attr name="name" value="Demo - manual login of capName bilibili" />
+    <attr name="desc" value="Demo - manual login of capName bilibili, cookies / localStorage / headers / userData(salt) are needed." />
+    <attr name="domainId" value="10004" />
+    <attr name="templateCat" value="12" />
+    <attr name="cfgShareLevel" value="120" />
+  </attrs>
+  <paras />
+  <actions>
+    <!-- open the login page -->
+    <action_goto url="https://bilibili.com/" wait="2000" />
+    <!-- regularly check if you have logged in successfully -->
+    <action_loopfor from="0" to="180" varname="varname">
+      <action_ifelse>
+        <condition_element>
+          <!-- or check cookie SESSDATA or DedeUserId -->
+          <element loc="li.header-avatar-wrap" />
+          <elecontent_length />
+          <!-- intercept related request if http headers are needed -->
+          <action_intercept_set>
+            <response_cache url="https://api.bilibili.com/x/web-interface/nav" method="GET" resourcetype="xhr" cacherequest="true" />
+          </action_intercept_set>
+          <action_click wait="3000">
+            <element loc="ul.left-entry > li:first-child > a" />
+          </action_click>
+          <!-- get salt that is used bo calculate sign -->
+          <action_api url="https://api.bilibili.com/x/web-interface/nav" subkeys="data.wbi_img" setkeys="*" />
+          <action_setvar_templstr varname="subKey" templ="${sub_url}">
+            <transform usevar="true">
+              <fun_split split="[/.]" />
+              <fun_a_at idx="-2" />
+            </transform>
+          </action_setvar_templstr>
+          <action_setvar_templstr varname="mixinKey" templ="${img_url}">
+            <transform usevar="true">
+              <fun_split split="[/.]" />
+              <fun_a_at idx="-2" />
+              <fun_concat str1="${subKey}" />
+            </transform>
+          </action_setvar_templstr>
+          <action_loopinstr list="46,47,18,2,53,8,23,32,15,50,10,31,58,3,45,35,27,43,5,49,33,9,42,19,29,28,14,39,12,38,41,13" split="," varname="idx">
+            <action_setvar_templstr varname="char" templ="${mixinKey}">
+              <transform usevar="true">
+                <fun_at idx="${idx}" />
+              </transform>
+            </action_setvar_templstr>
+            <action_setvar_templstr varname="salt" templ="${salt}">
+              <transform usevar="true">
+                <fun_concat str1="${char}" />
+              </transform>
+            </action_setvar_templstr>
+          </action_loopinstr>
+          <action_setvar_templstr varname="userData.salt" templ="${salt}" />
+          <action_misc>
+            <!-- succeeded to log in -->
+            <!-- by default, cookies and localStorage are included -->
+            <misc_getstatedata headers="cachedRequestHeaders" userdata="new" />
+          </action_misc>
+          <action_exit errname="normal" />
+        </condition_element>
+        <condition_else>
+          <action_wait_sleep minms="2000" maxms="2000" />
+        </condition_else>
+      </action_ifelse>
+    </action_loopfor>
+    <!-- failed to log in -->
+    <action_exit errname="other" />
+  </actions>
+</template>
